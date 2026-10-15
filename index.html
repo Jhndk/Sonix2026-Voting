@@ -55,17 +55,17 @@ google.script = google.script || {};
   const bridge=document.getElementById('sonixGasBridge');
   const pending=new Map();
   let seq=0,ready=false,queue=[];
-  const GAS_ORIGIN='https://script.google.com';
+  const GAS_ORIGINS=new Set(['https://script.google.com','https://script.googleusercontent.com']);
   function send(job){
     if(!ready){queue.push(job);return;}
     const id='sonix-'+Date.now()+'-'+(++seq);
     pending.set(id,job);
-    try{bridge.contentWindow.postMessage({type:'SONIX_RPC',id,method:job.method,args:job.args},GAS_ORIGIN);}
+    try{bridge.contentWindow.postMessage({type:'SONIX_RPC',id,method:job.method,args:job.args},'*');}
     catch(e){pending.delete(id);if(job.failure)job.failure(e);}
     setTimeout(()=>{if(pending.has(id)){pending.delete(id);if(job.failure)job.failure(new Error('Layanan voting tidak merespons. Muat ulang halaman dan coba lagi.'));}},20000);
   }
   window.addEventListener('message',function(e){
-    if(e.origin!==GAS_ORIGIN||!e.data)return;
+    if(!GAS_ORIGINS.has(e.origin)||!e.data)return;
     if(e.data.type==='SONIX_BRIDGE_READY'){ready=true;queue.splice(0).forEach(send);return;}
     if(e.data.type!=='SONIX_RPC_RESULT')return;
     const job=pending.get(e.data.id);if(!job)return;pending.delete(e.data.id);
