@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SONIX Voting Bridge</title></head>
+<body>
+<script>
+(function () {
+  'use strict';
+  const ALLOWED_PARENT_ORIGIN = 'https://jhndk.github.io';
+  const ALLOWED_METHODS = new Set([
+    'getVoteSecurityStatus',
+    'validateVotingCode',
+    'getStandList',
+    'submitVote'
+  ]);
+
+  function reply(target, origin, id, ok, result) {
+    target.postMessage({
+      type: 'SONIX_RPC_RESULT',
+      id: id,
+      ok: ok,
+      result: ok ? result : undefined,
+      error: ok ? undefined : String(result && result.message || result || 'Terjadi kesalahan pada layanan voting.')
+    }, origin);
+  }
+
+  window.addEventListener('message', function (event) {
+    if (event.origin !== ALLOWED_PARENT_ORIGIN || event.source !== parent) return;
+    const msg = event.data;
+    if (!msg || msg.type !== 'SONIX_RPC' || typeof msg.id !== 'string') return;
+    if (!ALLOWED_METHODS.has(msg.method) || !Array.isArray(msg.args)) {
+      reply(event.source, event.origin, msg.id, false, 'Permintaan tidak diizinkan.');
+      return;
+    }
+
+    const success = function (result) {
+      reply(event.source, event.origin, msg.id, true, result);
+    };
+    const failure = function (error) {
+      reply(event.source, event.origin, msg.id, false, error);
+    };
+
+    try {
+      const runner = google.script.run
+        .withSuccessHandler(success)
+        .withFailureHandler(failure);
+      runner[msg.method].apply(runner, msg.args);
+    } catch (error) {
+      failure(error);
+    }
+  });
+
+  parent.postMessage({ type: 'SONIX_BRIDGE_READY' }, ALLOWED_PARENT_ORIGIN);
+})();
+</script>
+</body>
+</html>
