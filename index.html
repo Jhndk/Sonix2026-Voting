@@ -72,16 +72,24 @@ google.script = google.script || {};
     if(e.data.ok){if(job.success)job.success(e.data.result);}
     else if(job.failure)job.failure(new Error(e.data.error||'Terjadi kesalahan pada layanan voting.'));
   });
+  let runnerProxy;
   const runner={
     _success:null,_failure:null,
-    withSuccessHandler(fn){this._success=fn;return this;},
-    withFailureHandler(fn){this._failure=fn;return this;}
+    withSuccessHandler(fn){this._success=fn;return runnerProxy;},
+    withFailureHandler(fn){this._failure=fn;return runnerProxy;}
   };
-  google.script.run=new Proxy(runner,{get(target,key){
-    if(key in target)return target[key].bind(target);
+  runnerProxy=new Proxy(runner,{get(target,key){
+    if(key in target){
+      const value=target[key];
+      return typeof value==='function'?value.bind(target):value;
+    }
     if(typeof key!=='string')return undefined;
-    return function(...args){const job={method:key,args,success:target._success,failure:target._failure};target._success=null;target._failure=null;send(job);};
+    return function(...args){
+      const job={method:key,args,success:target._success,failure:target._failure};
+      target._success=null;target._failure=null;send(job);
+    };
   }});
+  google.script.run=runnerProxy;
 })();
 </script>
 <script>
